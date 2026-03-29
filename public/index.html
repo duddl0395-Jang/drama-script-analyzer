@@ -217,6 +217,63 @@
       flex: 1; padding: 6px 10px; background: #2a2a2a; border: 1px solid #3a3a3a;
       border-radius: 4px; color: #e5e5e5; font-size: 12px; font-family: inherit;
     }
+
+    /* ── Chat ────────────────────────────────────────────────── */
+    .chat-container {
+      display: flex; flex-direction: column; height: 100%; width: 100%;
+    }
+    .chat-messages {
+      flex: 1; overflow-y: auto; padding: 32px;
+      max-width: 800px; margin: 0 auto; width: 100%;
+    }
+    .chat-welcome { text-align: center; padding: 80px 20px 40px; }
+    .chat-welcome-icon { font-size: 48px; margin-bottom: 16px; }
+    .chat-welcome-title { font-size: 22px; font-weight: 700; color: white; margin-bottom: 8px; }
+    .chat-welcome-sub { font-size: 14px; color: #888; margin-bottom: 32px; }
+    .chat-examples { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+    .chat-example {
+      background: #2a2a2a; border: 1px solid #3a3a3a; border-radius: 20px;
+      padding: 10px 18px; font-size: 13px; color: #ccc; cursor: pointer;
+      transition: all 0.2s;
+    }
+    .chat-example:hover { border-color: #e50914; color: white; background: #1e1014; }
+
+    .chat-bubble {
+      max-width: 85%; padding: 14px 18px; border-radius: 16px;
+      font-size: 14px; line-height: 1.7; margin-bottom: 16px;
+      animation: fadeIn 0.3s ease;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    .chat-bubble.user {
+      background: #e50914; color: white; margin-left: auto;
+      border-bottom-right-radius: 4px;
+    }
+    .chat-bubble.bot {
+      background: #2a2a2a; color: #ddd;
+      border-bottom-left-radius: 4px;
+    }
+    .chat-bubble.bot .scene-ref { color: #e50914; font-weight: 600; }
+    .chat-bubble.thinking {
+      background: #2a2a2a; color: #888; font-style: italic;
+    }
+
+    .chat-input-area {
+      padding: 16px 32px; border-top: 1px solid #2a2a2a;
+      display: flex; gap: 10px; max-width: 800px; margin: 0 auto; width: 100%;
+    }
+    .chat-input {
+      flex: 1; padding: 12px 18px; background: #2a2a2a; border: 1px solid #3a3a3a;
+      border-radius: 24px; color: #e5e5e5; font-size: 14px; font-family: inherit;
+      transition: border-color 0.2s;
+    }
+    .chat-input:focus { border-color: #e50914; outline: none; }
+    .chat-send {
+      padding: 12px 24px; background: #e50914; color: white; border: none;
+      border-radius: 24px; font-size: 14px; font-weight: 600; cursor: pointer;
+      font-family: inherit; transition: all 0.2s;
+    }
+    .chat-send:hover { background: #f40612; }
+    .chat-send:disabled { background: #3a3a3a; color: #666; cursor: not-allowed; }
   </style>
 </head>
 <body>
@@ -227,6 +284,7 @@
   <div class="nav">
     <a class="active" onclick="switchTab('scenes')">씬 분석</a>
     <a onclick="switchTab('summary')">회차별 요약</a>
+    <a onclick="switchTab('chat')">질문하기</a>
   </div>
 </div>
 
@@ -273,9 +331,6 @@
       <button class="btn btn-red" id="summaryBtn" onclick="generateSummary()" disabled>회차 요약 생성</button>
     </div>
 
-    <div class="sidebar-section">
-      <button class="btn btn-dark" onclick="exportJSON()">JSON 내보내기</button>
-    </div>
   </div>
 
   <!-- Main -->
@@ -283,6 +338,7 @@
     <div class="tab-bar">
       <div class="tab active" onclick="switchTab('scenes')">씬 분석</div>
       <div class="tab" onclick="switchTab('summary')">회차별 요약</div>
+      <div class="tab" onclick="switchTab('chat')">💬 질문하기</div>
     </div>
 
     <div class="tab-content active" id="tab-scenes">
@@ -302,6 +358,29 @@
         <div class="empty-state">
           <div class="big">📊</div>
           <p>씬 분석 완료 후<br>회차 요약을 생성하세요</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chat tab -->
+    <div class="tab-content" id="tab-chat">
+      <div class="chat-container">
+        <div class="chat-messages" id="chatMessages">
+          <div class="chat-welcome">
+            <div class="chat-welcome-icon">💬</div>
+            <div class="chat-welcome-title">대본에 대해 물어보세요</div>
+            <div class="chat-welcome-sub">분석된 데이터를 기반으로 답변합니다</div>
+            <div class="chat-examples">
+              <div class="chat-example" onclick="askExample(this)">키스신은 몇화에 나오나요?</div>
+              <div class="chat-example" onclick="askExample(this)">주인공이 처음 만나는 씬은?</div>
+              <div class="chat-example" onclick="askExample(this)">바이럴 될 만한 장면 알려줘</div>
+              <div class="chat-example" onclick="askExample(this)">가장 공감되는 직장인 씬은?</div>
+            </div>
+          </div>
+        </div>
+        <div class="chat-input-area">
+          <input type="text" id="chatInput" class="chat-input" placeholder="질문을 입력하세요..." onkeydown="if(event.key==='Enter')sendChat()" />
+          <button class="chat-send" onclick="sendChat()" id="chatSendBtn">전송</button>
         </div>
       </div>
     </div>
@@ -337,9 +416,10 @@ function switchTab(tab) {
   document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.nav a').forEach(a => a.classList.remove('active'));
   document.getElementById(`tab-${tab}`).classList.add('active');
-  const idx = tab === 'scenes' ? 0 : 1;
-  document.querySelectorAll('.tab')[idx].classList.add('active');
-  document.querySelectorAll('.nav a')[idx].classList.add('active');
+  const tabs = ['scenes','summary','chat'];
+  const idx = tabs.indexOf(tab);
+  document.querySelectorAll('.tab')[idx]?.classList.add('active');
+  document.querySelectorAll('.nav a')[idx]?.classList.add('active');
 }
 
 // ── File labels ─────────────────────────────────────────────────────────────
@@ -580,11 +660,82 @@ function updateUI() {
 
 function setStatus(t) { document.getElementById('statusBar').textContent = `Scriptor — ${t}`; }
 
-function exportJSON() {
-  const data = { episodes:{}, summaries: state.summaries };
-  for (const [ep,d] of Object.entries(state.episodes)) data.episodes[ep] = d.annotations;
-  const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'scriptor_analysis.json'; a.click();
+// ── Chat ────────────────────────────────────────────────────────────────────
+function askExample(el) {
+  document.getElementById('chatInput').value = el.textContent;
+  sendChat();
+}
+
+async function sendChat() {
+  const input = document.getElementById('chatInput');
+  const question = input.value.trim();
+  if (!question) return;
+
+  const hasData = Object.values(state.episodes).some(d => Object.keys(d.annotations).length > 0);
+  if (!hasData) {
+    alert('먼저 씬 분석을 완료해주세요.');
+    return;
+  }
+
+  const msgBox = document.getElementById('chatMessages');
+
+  // Hide welcome
+  const welcome = msgBox.querySelector('.chat-welcome');
+  if (welcome) welcome.style.display = 'none';
+
+  // User bubble
+  msgBox.innerHTML += `<div class="chat-bubble user">${escapeHtml(question)}</div>`;
+  input.value = '';
+  document.getElementById('chatSendBtn').disabled = true;
+
+  // Thinking bubble
+  const thinkId = 'think_' + Date.now();
+  msgBox.innerHTML += `<div class="chat-bubble thinking" id="${thinkId}">답변 생성 중...</div>`;
+  msgBox.scrollTop = msgBox.scrollHeight;
+
+  // Build episodes data
+  const episodes = {};
+  for (const [ep, d] of Object.entries(state.episodes)) {
+    episodes[ep] = Object.values(d.annotations);
+  }
+
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question, episodes, summaries: state.summaries, api_key: '' }),
+    });
+    const data = await res.json();
+    const thinkEl = document.getElementById(thinkId);
+
+    if (data.error) {
+      thinkEl.className = 'chat-bubble bot';
+      thinkEl.innerHTML = `오류: ${data.error}`;
+    } else {
+      thinkEl.className = 'chat-bubble bot';
+      thinkEl.innerHTML = formatAnswer(data.answer);
+    }
+  } catch (e) {
+    const thinkEl = document.getElementById(thinkId);
+    thinkEl.className = 'chat-bubble bot';
+    thinkEl.innerHTML = `오류: ${e.message}`;
+  }
+
+  document.getElementById('chatSendBtn').disabled = false;
+  msgBox.scrollTop = msgBox.scrollHeight;
+}
+
+function escapeHtml(t) {
+  return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function formatAnswer(text) {
+  // Bold S# references
+  text = escapeHtml(text);
+  text = text.replace(/(S#\d+)/g, '<span class="scene-ref">$1</span>');
+  text = text.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+  text = text.replace(/\n/g, '<br>');
+  return text;
 }
 </script>
 </body>
