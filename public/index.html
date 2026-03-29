@@ -274,6 +274,7 @@
     }
     .chat-send:hover { background: #f40612; }
     .chat-send:disabled { background: #3a3a3a; color: #666; cursor: not-allowed; }
+    .input-mode-btn.active { background: #e50914 !important; color: white !important; border-color: #e50914 !important; }
 
     /* ── Mobile toggle ──────────────────────────────────────── */
     .mobile-sidebar-toggle {
@@ -382,14 +383,27 @@
     </div>
 
     <div class="sidebar-section">
-      <div class="sidebar-label">에피소드 업로드</div>
-      <div class="file-drop" onclick="document.getElementById('pdfFiles').click()">
-        <div class="file-drop-icon">📄</div>
-        <div class="file-drop-text"><b>클릭</b>하여 PDF 업로드<br>여러 화 동시 가능</div>
-        <input type="file" id="pdfFiles" accept=".pdf" multiple />
+      <div class="sidebar-label">입력 방식</div>
+      <div style="display:flex;gap:4px;margin-bottom:10px;">
+        <button class="btn btn-dark input-mode-btn active" id="modeUpload" onclick="setInputMode('upload')" style="flex:1;margin:0;font-size:12px;padding:8px;">PDF 업로드</button>
+        <button class="btn btn-dark input-mode-btn" id="modePaste" onclick="setInputMode('paste')" style="flex:1;margin:0;font-size:12px;padding:8px;">텍스트 붙여넣기</button>
       </div>
-      <div id="epLabels"></div>
-      <button class="btn btn-dark" id="parseBtn" onclick="parsePDFs()" style="margin-top:10px;">대본 구조화 시작</button>
+
+      <div id="uploadMode">
+        <div class="file-drop" onclick="document.getElementById('pdfFiles').click()">
+          <div class="file-drop-icon">📄</div>
+          <div class="file-drop-text"><b>클릭</b>하여 PDF 업로드<br>여러 화 동시 가능</div>
+          <input type="file" id="pdfFiles" accept=".pdf" multiple />
+        </div>
+        <div id="epLabels"></div>
+      </div>
+
+      <div id="pasteMode" style="display:none;">
+        <input type="text" id="pasteEpName" placeholder="에피소드 이름 (예: 1화)" style="margin-bottom:8px;" />
+        <textarea id="pasteText" placeholder="대본 텍스트를 여기에 붙여넣으세요...&#10;&#10;예시:&#10;S#1.  지윤집(밤)&#10;지윤, 침대에서 일어나며..." style="width:100%;min-height:150px;background:#2a2a2a;border:1px solid #3a3a3a;border-radius:6px;color:#e5e5e5;padding:10px;font-size:13px;font-family:inherit;resize:vertical;"></textarea>
+      </div>
+
+      <button class="btn btn-dark" id="parseBtn" onclick="parseInput()" style="margin-top:10px;">대본 구조화 시작</button>
     </div>
 
     <div class="divider"></div>
@@ -520,12 +534,30 @@ document.getElementById('pdfFiles').addEventListener('change', function() {
 });
 
 // ── Parse ───────────────────────────────────────────────────────────────────
+let inputMode = 'upload';
+
+function setInputMode(mode) {
+  inputMode = mode;
+  document.getElementById('uploadMode').style.display = mode === 'upload' ? 'block' : 'none';
+  document.getElementById('pasteMode').style.display = mode === 'paste' ? 'block' : 'none';
+  document.getElementById('modeUpload').classList.toggle('active', mode === 'upload');
+  document.getElementById('modePaste').classList.toggle('active', mode === 'paste');
+}
+
+async function parseInput() {
+  if (inputMode === 'upload') {
+    await parsePDFs();
+  } else {
+    await parseText();
+  }
+}
+
 async function parsePDFs() {
   const files = document.getElementById('pdfFiles').files;
-  if (!files.length) return;
+  if (!files.length) { alert('PDF 파일을 선택해주세요.'); return; }
   const btn = document.getElementById('parseBtn');
-  btn.disabled = true; btn.textContent = '파싱 중...';
-  setStatus('파싱 중...');
+  btn.disabled = true; btn.textContent = '구조화 중...';
+  setStatus('구조화 중...');
 
   for (let i = 0; i < files.length; i++) {
     const label = document.getElementById(`epLabel_${i}`)?.value || files[i].name;
@@ -534,18 +566,47 @@ async function parsePDFs() {
     try {
       const res = await fetch('/api/parse', { method:'POST', body: fd });
       const data = await res.json();
-      if (data.error) { alert(`[${label}] 파싱 실패: ${data.error}`); continue; }
+      if (data.error) { alert(`[${label}] 구조화 실패: ${data.error}`); continue; }
       state.episodes[label] = { scenes: data.scenes, annotations: {}, done: false };
       setStatus(`✅ ${label}: ${data.total_scenes}개 씬`);
-    } catch(e) { alert(`파싱 실패: ${e.message}`); }
+    } catch(e) { alert(`구조화 실패: ${e.message}`); }
   }
 
+  finishParse();
+  btn.disabled = false; btn.textContent = '대본 구조화 시작';
+}
+
+async function parseText() {
+  const text = document.getElementById('pasteText').value.trim();
+  const label = document.getElementById('pasteEpName').value.trim() || '에피소드';
+  if (!text) { alert('대본 텍스트를 붙여넣어주세요.'); return; }
+
+  const btn = document.getElementById('parseBtn');
+  btn.disabled = true; btn.textContent = '구조화 중...';
+  setStatus('구조화 중...');
+
+  try {
+    const res = await fetch('/api/parse', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+    const data = await res.json();
+    if (data.error) { alert(`구조화 실패: ${data.error}`); return; }
+    state.episodes[label] = { scenes: data.scenes, annotations: {}, done: false };
+    setStatus(`✅ ${label}: ${data.total_scenes}개 씬`);
+  } catch(e) { alert(`구조화 실패: ${e.message}`); }
+
+  finishParse();
+  btn.disabled = false; btn.textContent = '대본 구조화 시작';
+}
+
+function finishParse() {
   const eps = Object.keys(state.episodes);
   if (eps.length) {
     state.currentEpisode = eps[0];
     state.selectedScene = state.episodes[eps[0]].scenes[0]?.scene_id;
   }
-  btn.disabled = false; btn.textContent = '대본 구조화 시작';
   updateUI();
 }
 
