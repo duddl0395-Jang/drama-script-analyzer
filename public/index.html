@@ -370,8 +370,14 @@
       <div class="sidebar-label">장르</div>
       <select id="genre">
         <option value="오피스 로맨스 코미디">오피스 로맨스 코미디</option>
-        <option value="수사물">수사물</option>
-        <option value="로맨스">로맨스</option>
+        <option value="로맨스/멜로">로맨스/멜로</option>
+        <option value="범죄/수사">범죄/수사</option>
+        <option value="의학/법정">의학/법정</option>
+        <option value="역사/사극">역사/사극</option>
+        <option value="판타지/SF">판타지/SF</option>
+        <option value="가족/휴먼">가족/휴먼</option>
+        <option value="코미디">코미디</option>
+        <option value="스릴러/서스펜스">스릴러/서스펜스</option>
       </select>
     </div>
 
@@ -383,7 +389,7 @@
         <input type="file" id="pdfFiles" accept=".pdf" multiple />
       </div>
       <div id="epLabels"></div>
-      <button class="btn btn-dark" id="parseBtn" onclick="parsePDFs()" style="margin-top:10px;">대본 파싱</button>
+      <button class="btn btn-dark" id="parseBtn" onclick="parsePDFs()" style="margin-top:10px;">대본 구조화 시작</button>
     </div>
 
     <div class="divider"></div>
@@ -538,7 +544,7 @@ async function parsePDFs() {
     state.currentEpisode = eps[0];
     state.selectedScene = state.episodes[eps[0]].scenes[0]?.scene_id;
   }
-  btn.disabled = false; btn.textContent = '대본 파싱';
+  btn.disabled = false; btn.textContent = '대본 구조화 시작';
   updateUI();
 }
 
