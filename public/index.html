@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🎬 대본 분석 자동화</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #333; }
+
+    /* Header */
+    .header { background: #1a1a2e; color: white; padding: 20px 32px; display: flex; align-items: center; gap: 16px; }
+    .header h1 { font-size: 22px; }
+    .header span { font-size: 14px; color: #aaa; }
+
+    /* Layout */
+    .container { display: flex; height: calc(100vh - 68px); }
+    .sidebar { width: 320px; background: white; border-right: 1px solid #e0e0e0; padding: 20px; overflow-y: auto; flex-shrink: 0; }
+    .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+    /* Tabs */
+    .tabs { display: flex; background: white; border-bottom: 1px solid #e0e0e0; }
+    .tab { padding: 12px 24px; cursor: pointer; font-size: 14px; font-weight: 500; border-bottom: 2px solid transparent; color: #666; }
+    .tab.active { color: #e74c3c; border-bottom-color: #e74c3c; }
+    .tab:hover { background: #f9f9f9; }
+
+    /* Tab content */
+    .tab-content { flex: 1; overflow: hidden; display: none; }
+    .tab-content.active { display: flex; }
+
+    /* Scene tab layout */
+    .scene-list { width: 50%; overflow-y: auto; padding: 16px; border-right: 1px solid #e0e0e0; }
+    .scene-detail { width: 50%; overflow-y: auto; padding: 20px; background: #fafafa; }
+
+    /* Summary tab */
+    .summary-content { flex: 1; overflow-y: auto; padding: 24px; width: 100%; }
+
+    /* Sidebar elements */
+    .sidebar h3 { font-size: 14px; color: #888; margin-bottom: 8px; margin-top: 16px; }
+    .sidebar h3:first-child { margin-top: 0; }
+    .sidebar input[type="password"], .sidebar select { width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; margin-bottom: 4px; }
+    .sidebar input[type="file"] { font-size: 13px; margin-bottom: 8px; }
+    .divider { height: 1px; background: #eee; margin: 16px 0; }
+
+    .btn { padding: 10px 16px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; width: 100%; margin-bottom: 8px; transition: all 0.2s; }
+    .btn-primary { background: #e74c3c; color: white; }
+    .btn-primary:hover { background: #c0392b; }
+    .btn-primary:disabled { background: #ccc; cursor: not-allowed; }
+    .btn-secondary { background: #eee; color: #333; }
+    .btn-secondary:hover { background: #ddd; }
+
+    /* Scene buttons */
+    .scene-btn { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid #e0e0e0; border-radius: 8px; margin-bottom: 6px; cursor: pointer; background: white; width: 100%; text-align: left; font-size: 13px; transition: all 0.15s; }
+    .scene-btn:hover { border-color: #e74c3c; }
+    .scene-btn.selected { border-color: #e74c3c; background: #fff5f5; }
+    .scene-btn .icon { font-size: 16px; }
+    .scene-btn .flags { margin-left: auto; font-size: 14px; }
+
+    /* Annotation */
+    .ann-section { margin-bottom: 16px; }
+    .ann-section h4 { font-size: 13px; color: #888; margin-bottom: 6px; }
+    .ann-summary { background: white; padding: 12px; border-radius: 8px; font-size: 14px; line-height: 1.6; }
+    .ann-reaction { background: #e8f4fd; padding: 10px 12px; border-radius: 8px; font-size: 13px; border-left: 3px solid #3498db; }
+    .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; color: white; }
+    .empathy-box { background: #e8f8e8; padding: 10px 12px; border-radius: 8px; font-size: 13px; border-left: 3px solid #2ecc71; }
+    .inflection-box { background: #fff8e1; padding: 10px 12px; border-radius: 8px; font-size: 13px; border-left: 3px solid #f39c12; }
+
+    .viral-card { background: white; border: 1px solid #eee; border-radius: 8px; padding: 12px; margin-bottom: 8px; }
+    .viral-card .platform { font-size: 11px; padding: 1px 8px; border-radius: 10px; color: white; display: inline-block; }
+    .viral-card .line { font-weight: 600; margin: 6px 0; font-size: 14px; }
+    .viral-card .rationale { font-size: 12px; color: #888; }
+
+    /* Progress */
+    .progress-bar { width: 100%; height: 6px; background: #eee; border-radius: 3px; margin: 8px 0; }
+    .progress-fill { height: 100%; background: #e74c3c; border-radius: 3px; transition: width 0.3s; }
+    .progress-text { font-size: 12px; color: #888; }
+
+    /* Summary table */
+    .summary-table { width: 100%; border-collapse: separate; border-spacing: 4px; }
+    .summary-table th { background: #333; color: white; padding: 10px; border-radius: 4px; text-align: center; font-size: 14px; }
+    .summary-table .row-label { background: #555; color: white; padding: 12px; border-radius: 4px; text-align: center; font-size: 13px; font-weight: 600; min-width: 80px; vertical-align: middle; }
+    .summary-table .row-label.romance { background: #c0392b; }
+    .summary-table td { background: #f9f9f9; padding: 12px; border-radius: 4px; font-size: 13px; line-height: 1.6; vertical-align: top; }
+    .summary-table td.romance-cell { background: #fff5f5; }
+    .summary-table td.reaction-cell { font-size: 12px; color: #444; }
+    .summary-table b { color: #c0392b; }
+
+    /* Episode tags */
+    .ep-tag { display: inline-flex; align-items: center; gap: 4px; background: #eee; padding: 4px 10px; border-radius: 12px; font-size: 12px; margin: 2px; }
+    .ep-tag .ep-done { color: #2ecc71; }
+    .ep-tag .ep-pending { color: #ccc; }
+    .ep-tag .remove { cursor: pointer; color: #999; margin-left: 4px; }
+    .ep-tag .remove:hover { color: #e74c3c; }
+    .ep-tags { margin: 8px 0; display: flex; flex-wrap: wrap; gap: 4px; }
+
+    .empty-state { text-align: center; color: #aaa; padding: 60px 20px; font-size: 14px; }
+    .status-bar { padding: 8px 16px; background: white; border-top: 1px solid #eee; font-size: 12px; color: #888; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🎬 대본 분석 자동화</h1>
+  <span>한국 드라마 대본 → 장르별 씬 분석 + 회차 요약</span>
+</div>
+
+<div class="container">
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <h3>1. API 설정</h3>
+    <input type="password" id="apiKey" placeholder="Claude API Key (sk-ant-...)" />
+    <select id="genre">
+      <option value="오피스 로맨스 코미디">오피스 로맨스 코미디</option>
+      <option value="수사물">수사물</option>
+      <option value="로맨스">로맨스</option>
+    </select>
+
+    <div class="divider"></div>
+    <h3>2. 에피소드 업로드</h3>
+    <input type="file" id="pdfFiles" accept=".pdf" multiple />
+    <div id="epLabels"></div>
+    <button class="btn btn-secondary" id="parseBtn" onclick="parsePDFs()">대본 파싱</button>
+
+    <div class="divider"></div>
+    <h3>3. 에피소드 목록</h3>
+    <div id="epTags" class="ep-tags"></div>
+    <select id="epSelector" onchange="switchEpisode()"></select>
+
+    <div class="divider"></div>
+    <h3>4. 분석</h3>
+    <button class="btn btn-primary" id="analyzeBtn" onclick="analyzeScenes()" disabled>▶ 씬 분석 시작</button>
+    <div class="progress-bar" id="analyzeProgress" style="display:none"><div class="progress-fill" id="analyzeFill"></div></div>
+    <div class="progress-text" id="analyzeStatus"></div>
+
+    <div class="divider"></div>
+    <h3>5. 회차 요약</h3>
+    <button class="btn btn-primary" id="summaryBtn" onclick="generateSummary()" disabled>📊 요약 장표 생성</button>
+
+    <div class="divider"></div>
+    <h3>6. 내보내기</h3>
+    <button class="btn btn-secondary" onclick="exportJSON()">JSON 다운로드</button>
+  </div>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('scenes')">📄 씬 분석</div>
+      <div class="tab" onclick="switchTab('summary')">📊 회차별 요약</div>
+    </div>
+
+    <!-- Scenes tab -->
+    <div class="tab-content active" id="tab-scenes">
+      <div class="scene-list" id="sceneList">
+        <div class="empty-state">대본을 업로드하고 파싱하세요</div>
+      </div>
+      <div class="scene-detail" id="sceneDetail">
+        <div class="empty-state">씬을 선택하면 분석 결과가 표시됩니다</div>
+      </div>
+    </div>
+
+    <!-- Summary tab -->
+    <div class="tab-content" id="tab-summary">
+      <div class="summary-content" id="summaryContent">
+        <div class="empty-state">씬 분석 완료 후 요약 장표를 생성하세요</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="status-bar" id="statusBar">준비됨</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────────
+const state = {
+  episodes: {},         // { "1화": { scenes: [], annotations: {}, done: false } }
+  summaries: {},        // { "1화": { character_events, romance, expected_reactions } }
+  currentEpisode: null,
+  selectedScene: null,
+};
+
+// ── Tab switching ──────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelector(`#tab-${tab}`).classList.add('active');
+  document.querySelectorAll('.tab')[tab === 'scenes' ? 0 : 1].classList.add('active');
+}
+
+// ── File upload labels ─────────────────────────────────────────────────────────
+document.getElementById('pdfFiles').addEventListener('change', function() {
+  const container = document.getElementById('epLabels');
+  container.innerHTML = '';
+  Array.from(this.files).forEach((f, i) => {
+    const name = f.name.replace('.pdf', '');
+    const div = document.createElement('div');
+    div.style.cssText = 'margin:4px 0;display:flex;align-items:center;gap:6px;font-size:13px;';
+    div.innerHTML = `<span style="color:#888;min-width:100px;overflow:hidden;text-overflow:ellipsis;">${f.name}</span>
+      <input type="text" value="${name}" id="epLabel_${i}"
+        style="flex:1;padding:4px 8px;border:1px solid #ddd;border-radius:4px;font-size:13px;" />`;
+    container.appendChild(div);
+  });
+});
+
+// ── Parse PDFs ─────────────────────────────────────────────────────────────────
+async function parsePDFs() {
+  const files = document.getElementById('pdfFiles').files;
+  if (!files.length) return alert('PDF 파일을 선택해주세요.');
+
+  const parseBtn = document.getElementById('parseBtn');
+  parseBtn.disabled = true;
+  parseBtn.textContent = '파싱 중...';
+  setStatus('파싱 중...');
+
+  for (let i = 0; i < files.length; i++) {
+    const label = document.getElementById(`epLabel_${i}`).value || files[i].name;
+    const formData = new FormData();
+    formData.append('pdf', files[i]);
+
+    try {
+      const res = await fetch('/api/parse', { method: 'POST', body: formData });
+      const data = await res.json();
+
+      state.episodes[label] = { scenes: data.scenes, annotations: {}, done: false };
+      if (data.warnings?.length) {
+        data.warnings.forEach(w => alert(`[${label}] ${w}`));
+      }
+      setStatus(`✅ ${label}: ${data.total_scenes}개 씬 파싱 완료`);
+    } catch (e) {
+      alert(`파싱 실패: ${e.message}`);
+    }
+  }
+
+  const eps = Object.keys(state.episodes);
+  if (eps.length) {
+    state.currentEpisode = eps[0];
+    state.selectedScene = state.episodes[eps[0]].scenes[0]?.scene_id;
+  }
+
+  parseBtn.disabled = false;
+  parseBtn.textContent = '대본 파싱';
+  updateUI();
+}
+
+// ── Analyze scenes ─────────────────────────────────────────────────────────────
+async function analyzeScenes() {
+  const apiKey = document.getElementById('apiKey').value;
+  const genre = document.getElementById('genre').value;
+  const ep = state.currentEpisode;
+  if (!apiKey) return alert('API Key를 입력해주세요.');
+  if (!ep) return alert('에피소드를 선택해주세요.');
+
+  const epData = state.episodes[ep];
+  epData.annotations = {};
+  epData.done = false;
+
+  const analyzeBtn = document.getElementById('analyzeBtn');
+  analyzeBtn.disabled = true;
+  document.getElementById('analyzeProgress').style.display = 'block';
+
+  const total = epData.scenes.length;
+  for (let i = 0; i < total; i++) {
+    const scene = epData.scenes[i];
+    setStatus(`분석 중... ${i+1}/${total} (${scene.scene_id})`);
+    document.getElementById('analyzeFill').style.width = `${((i+1)/total)*100}%`;
+    document.getElementById('analyzeStatus').textContent = `${i+1} / ${total}`;
+
+    try {
+      const res = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scene, genre, api_key: apiKey }),
+      });
+      const ann = await res.json();
+      epData.annotations[scene.scene_id] = ann;
+
+      if (i === 0) state.selectedScene = scene.scene_id;
+      renderSceneList();
+      if (scene.scene_id === state.selectedScene) renderAnnotation(ann);
+    } catch (e) {
+      epData.annotations[scene.scene_id] = {
+        scene_id: scene.scene_id, scene_type: 'error',
+        summary: `에러: ${e.message}`, _error: true
+      };
+    }
+  }
+
+  epData.done = true;
+  analyzeBtn.disabled = false;
+  document.getElementById('analyzeProgress').style.display = 'none';
+  setStatus(`✅ ${ep} 전체 ${total}개 씬 분석 완료!`);
+  updateUI();
+}
+
+// ── Generate summary ───────────────────────────────────────────────────────────
+async function generateSummary() {
+  const apiKey = document.getElementById('apiKey').value;
+  if (!apiKey) return alert('API Key를 입력해주세요.');
+
+  const summaryBtn = document.getElementById('summaryBtn');
+  summaryBtn.disabled = true;
+  summaryBtn.textContent = '요약 생성 중...';
+
+  const doneEps = Object.entries(state.episodes)
+    .filter(([_, d]) => d.done)
+    .map(([ep]) => ep)
+    .sort();
+
+  for (const ep of doneEps) {
+    setStatus(`${ep} 요약 생성 중...`);
+    const annotations = Object.values(state.episodes[ep].annotations);
+    try {
+      const res = await fetch('/api/summary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ episode: ep, annotations, api_key: apiKey }),
+      });
+      state.summaries[ep] = await res.json();
+    } catch (e) {
+      state.summaries[ep] = { episode: ep, character_events: `실패: ${e.message}`, romance: '', expected_reactions: [], _error: true };
+    }
+  }
+
+  summaryBtn.disabled = false;
+  summaryBtn.textContent = '📊 요약 장표 생성';
+  setStatus('✅ 요약 장표 생성 완료!');
+  renderSummaryTable();
+  switchTab('summary');
+}
+
+// ── Render functions ───────────────────────────────────────────────────────────
+const SCENE_ICONS = {
+  romance_beat: '💕', office_moment: '💼', comedy_beat: '😄',
+  case_open: '🔍', investigation: '🔎', confrontation: '⚡',
+  reveal: '💡', conflict: '💢', resolution: '🤝', error: '⚠️', other: '📝'
+};
+const LOVE_COLORS = {
+  '첫 접점': '#FF6B9D', '감정 인식': '#FF8E53', '밀당': '#FFC300',
+  '갈등': '#E74C3C', '화해': '#2ECC71', '고백': '#9B59B6',
+  '결합': '#E91E63', '해당없음': '#95A5A6'
+};
+const PLATFORM_COLORS = { instagram: '#E1306C', youtube: '#FF0000', tiktok: '#010101' };
+
+function renderSceneList() {
+  const ep = state.currentEpisode;
+  if (!ep || !state.episodes[ep]) return;
+  const { scenes, annotations } = state.episodes[ep];
+  const nDone = Object.keys(annotations).length;
+  const nViral = Object.values(annotations).filter(a => a.viral_candidates?.length).length;
+
+  let html = `<div style="font-size:14px;font-weight:600;margin-bottom:12px;">${ep} — ${nDone}/${scenes.length}개 완료 · 🔥 ${nViral}씬</div>`;
+  for (const scene of scenes) {
+    const ann = annotations[scene.scene_id];
+    let icon = '⬜';
+    if (ann) icon = ann._error ? '❌' : (SCENE_ICONS[ann.scene_type] || '📝');
+    let flags = '';
+    if (ann?.viral_candidates?.length) flags += ' 🔥';
+    if (ann?.love_line_status && ann.love_line_status !== '해당없음') flags += ' 💕';
+    const selected = state.selectedScene === scene.scene_id ? 'selected' : '';
+    html += `<div class="scene-btn ${selected}" onclick="selectScene('${scene.scene_id}')">
+      <span class="icon">${icon}</span>
+      <span>${scene.scene_id}. ${scene.location}</span>
+      <span class="flags">${flags}</span>
+    </div>`;
+  }
+  document.getElementById('sceneList').innerHTML = html;
+}
+
+function selectScene(sid) {
+  state.selectedScene = sid;
+  renderSceneList();
+  const ann = state.episodes[state.currentEpisode]?.annotations[sid];
+  renderAnnotation(ann);
+}
+
+function renderAnnotation(ann) {
+  const el = document.getElementById('sceneDetail');
+  if (!ann) { el.innerHTML = '<div class="empty-state">씬을 선택하면 분석 결과가 표시됩니다</div>'; return; }
+  if (ann._error) { el.innerHTML = `<div style="color:#e74c3c;padding:20px;">${ann.summary}</div>`; return; }
+
+  const icon = SCENE_ICONS[ann.scene_type] || '📝';
+  let html = `<h3 style="margin-bottom:16px;">${icon} ${ann.scene_id} — ${ann.location || ''}</h3>`;
+  html += `<div class="ann-section"><h4>줄거리</h4><div class="ann-summary">${ann.summary || ''}</div></div>`;
+  html += `<div class="ann-section"><h4>시청자 반응</h4><div class="ann-reaction">${ann.audience_reaction || ''}</div></div>`;
+
+  if (ann.love_line_status && ann.love_line_status !== '해당없음') {
+    const color = LOVE_COLORS[ann.love_line_status] || '#95A5A6';
+    html += `<div class="ann-section"><h4>애정 전선</h4><span class="badge" style="background:${color}">${ann.love_line_status}</span>`;
+    if (ann.characters_involved?.length) html += `<div style="font-size:12px;color:#888;margin-top:4px;">${ann.characters_involved.join(' · ')}</div>`;
+    html += `</div>`;
+  }
+  if (ann.empathy_point) {
+    html += `<div class="ann-section"><h4>직장인 공감 포인트</h4><div class="empathy-box">${ann.empathy_point}</div></div>`;
+  }
+  if (ann.inflection_point) {
+    html += `<div class="ann-section"><h4>캐릭터 변곡점</h4><div class="inflection-box">${ann.inflection_point}</div></div>`;
+  }
+  if (ann.viral_candidates?.length) {
+    html += `<div class="ann-section"><h4>바이럴 후보</h4>`;
+    for (const v of ann.viral_candidates) {
+      const pc = PLATFORM_COLORS[v.platform] || '#555';
+      html += `<div class="viral-card">
+        <span class="platform" style="background:${pc}">${v.platform}</span>
+        <span style="font-size:12px;color:#666;margin-left:6px;">${v.clip_type}</span>
+        <div class="line">"${v.line_or_description}"</div>
+        <div class="rationale">${v.rationale}</div>
+      </div>`;
+    }
+    html += `</div>`;
+  }
+  el.innerHTML = html;
+}
+
+function renderSummaryTable() {
+  const eps = Object.keys(state.summaries).sort();
+  if (!eps.length) {
+    document.getElementById('summaryContent').innerHTML = '<div class="empty-state">요약 데이터 없음</div>';
+    return;
+  }
+
+  let html = '<table class="summary-table"><thead><tr><th></th>';
+  for (const ep of eps) html += `<th>${ep}</th>`;
+  html += '</tr></thead><tbody>';
+
+  // 주요 캐릭터 사건
+  html += '<tr><td class="row-label">주요<br>캐릭터<br>사건</td>';
+  for (const ep of eps) {
+    const d = state.summaries[ep];
+    const text = (d.character_events || '—').replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+    html += `<td>${text}</td>`;
+  }
+  html += '</tr>';
+
+  // 로맨스 전개
+  html += '<tr><td class="row-label romance">로맨스<br>전개</td>';
+  for (const ep of eps) {
+    const d = state.summaries[ep];
+    const text = (d.romance || '—').replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+    html += `<td class="romance-cell">${text}</td>`;
+  }
+  html += '</tr>';
+
+  // 예상 반응
+  html += '<tr><td class="row-label">예상<br>반응</td>';
+  for (const ep of eps) {
+    const d = state.summaries[ep];
+    const reactions = (d.expected_reactions || []).map(r => `"${r}"`).join('<br>');
+    html += `<td class="reaction-cell">${reactions || '—'}</td>`;
+  }
+  html += '</tr>';
+
+  html += '</tbody></table>';
+  document.getElementById('summaryContent').innerHTML = html;
+}
+
+// ── Episode switching ──────────────────────────────────────────────────────────
+function switchEpisode() {
+  const ep = document.getElementById('epSelector').value;
+  if (!ep) return;
+  state.currentEpisode = ep;
+  const scenes = state.episodes[ep]?.scenes;
+  state.selectedScene = scenes?.[0]?.scene_id || null;
+  renderSceneList();
+  renderAnnotation(null);
+}
+
+// ── UI update ──────────────────────────────────────────────────────────────────
+function updateUI() {
+  // Episode selector
+  const sel = document.getElementById('epSelector');
+  const eps = Object.keys(state.episodes).sort();
+  sel.innerHTML = eps.map(ep => `<option value="${ep}" ${ep === state.currentEpisode ? 'selected' : ''}>${ep}</option>`).join('');
+
+  // Episode tags
+  const tagsEl = document.getElementById('epTags');
+  tagsEl.innerHTML = eps.map(ep => {
+    const done = state.episodes[ep].done;
+    return `<span class="ep-tag">${ep} <span class="${done ? 'ep-done' : 'ep-pending'}">${done ? '✅' : '⬜'}</span></span>`;
+  }).join('');
+
+  // Buttons
+  document.getElementById('analyzeBtn').disabled = !state.currentEpisode;
+  const doneCount = Object.values(state.episodes).filter(d => d.done).length;
+  document.getElementById('summaryBtn').disabled = doneCount === 0;
+
+  renderSceneList();
+}
+
+function setStatus(text) {
+  document.getElementById('statusBar').textContent = text;
+}
+
+// ── Export ──────────────────────────────────────────────────────────────────────
+function exportJSON() {
+  const data = { episodes: {}, summaries: state.summaries };
+  for (const [ep, d] of Object.entries(state.episodes)) {
+    data.episodes[ep] = d.annotations;
+  }
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'analysis.json';
+  a.click();
+}
+</script>
+</body>
+</html>

@@ -6,11 +6,11 @@ import json
 import time
 import re
 import anthropic
-from .prompts import get_prompts_for_scene, GENRE_CONFIG
+from .prompts import get_prompts_for_scene, GENRE_CONFIG, SYSTEM_EPISODE_SUMMARY, build_episode_summary_prompt
 
 MAX_RETRIES = 3
 RETRY_DELAY = 1.5
-MODEL = "claude-haiku-4-5-20251001"  # 빠르고 저렴, 한국어 품질 우수
+MODEL = "claude-haiku-4-5-20251001"
 
 
 def _strip_markdown_fences(text):
@@ -76,6 +76,46 @@ def analyze_all_scenes(api_key, scenes, genre):
     client = anthropic.Anthropic(api_key=api_key)
     for scene in scenes:
         yield analyze_scene(client, scene, genre)
+
+
+def summarize_episode(api_key, episode_label, annotations):
+    """
+    annotations: list of scene annotation dicts for one episode.
+    Returns episode summary dict.
+    """
+    client = anthropic.Anthropic(api_key=api_key)
+    user_prompt = build_episode_summary_prompt(episode_label, annotations)
+
+    last_error = None
+    for attempt in range(MAX_RETRIES):
+        try:
+            response = client.messages.create(
+                model=MODEL,
+                max_tokens=1024,
+                system=SYSTEM_EPISODE_SUMMARY,
+                messages=[{"role": "user", "content": user_prompt}],
+                temperature=0.3,
+            )
+            raw = response.content[0].text
+            parsed = _parse_json_response(raw)
+            if parsed is not None:
+                parsed["episode"] = episode_label
+                return parsed
+
+            last_error = f"JSON 파싱 실패: {raw[:200]}"
+        except Exception as e:
+            last_error = str(e)
+
+        if attempt < MAX_RETRIES - 1:
+            time.sleep(RETRY_DELAY)
+
+    return {
+        "episode": episode_label,
+        "character_events": f"요약 실패: {last_error}",
+        "romance": "",
+        "expected_reactions": [],
+        "_error": True,
+    }
 
 
 def available_genres():
